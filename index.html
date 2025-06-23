@@ -197,6 +197,47 @@
         const complimentDisplay = document.getElementById('complimentDisplay');
         const speakButton = document.getElementById('speakButton'); // Get the new speak button
 
+        // Global variable to store available voices
+        let thaiFemaleVoice = null;
+
+        /**
+         * Function to set the preferred Thai voice.
+         * This needs to be called after voices are loaded.
+         */
+        function setPreferredThaiVoice() {
+            // Get all available voices
+            const voices = window.speechSynthesis.getVoices();
+            // Filter for Thai voices
+            const thaiVoices = voices.filter(voice => voice.lang === 'th-TH');
+
+            // Try to find a voice that sounds female or is a common default for Thai
+            // Voice names can vary, so we look for common patterns or just pick the first Thai voice
+            thaiFemaleVoice = thaiVoices.find(voice =>
+                voice.name.toLowerCase().includes('female') ||
+                voice.name.toLowerCase().includes('thailand') || // General Thai voice
+                voice.name.toLowerCase().includes('google') || // Google's voices are often good
+                voice.name.toLowerCase().includes('zira') || // A common default female voice on some systems
+                voice.name.toLowerCase().includes('natthida') // Example of a Thai female name often used for voices
+            );
+
+            // Fallback: If no specific "female" or "standard" Thai voice found, just pick the first available Thai voice
+            if (!thaiFemaleVoice && thaiVoices.length > 0) {
+                thaiFemaleVoice = thaiVoices[0];
+            }
+
+            if (!thaiFemaleVoice) {
+                console.warn('Could not find a specific Thai voice. Using browser default.');
+            } else {
+                console.log('Using voice:', thaiFemaleVoice.name);
+            }
+        }
+
+        // Event listener for when voices are loaded. This is crucial as voices might not be immediately available.
+        window.speechSynthesis.onvoiceschanged = setPreferredThaiVoice;
+        // Call it once immediately in case voices are already loaded
+        setPreferredThaiVoice();
+
+
         /**
          * Function to speak the given text using Web Speech API.
          * @param {string} text - The text to be spoken.
@@ -209,12 +250,12 @@
 
                 // Create a new speech utterance
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'th-TH'; // Set language to Thai for better pronunciation
+                utterance.lang = 'th-TH'; // Still set language for general Thai pronunciation
 
-                // Optional: You can adjust voice, pitch, and rate if needed
-                // utterance.voice = window.speechSynthesis.getVoices().find(voice => voice.lang === 'th-TH');
-                // utterance.pitch = 1; // 0 to 2, default is 1
-                // utterance.rate = 1;  // 0.1 to 10, default is 1
+                // Assign the preferred voice if found
+                if (thaiFemaleVoice) {
+                    utterance.voice = thaiFemaleVoice;
+                }
 
                 // Speak the utterance
                 window.speechSynthesis.speak(utterance);
