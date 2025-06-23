@@ -52,16 +52,35 @@
         </button> <!-- Translated button text -->
 
         <!-- Compliment Display Area -->
-        <div id="complimentDisplay" class="
-            mt-6 p-4
-            bg-pink-100 border border-pink-300
-            text-pink-800 text-lg sm:text-xl
-            font-semibold rounded-xl
-            min-h-[6rem] flex items-center justify-center
-            shadow-inner
-        ">
-            คลิกปุ่มเพื่อรับข้อความน่ารักๆ!
-        </div> <!-- Translated initial display text -->
+        <div class="relative mt-6">
+            <div id="complimentDisplay" class="
+                p-4 pr-12 /* Added padding for speaker icon */
+                bg-pink-100 border border-pink-300
+                text-pink-800 text-lg sm:text-xl
+                font-semibold rounded-xl
+                min-h-[6rem] flex items-center justify-center
+                shadow-inner
+            ">
+                คลิกปุ่มเพื่อรับข้อความน่ารักๆ!
+            </div>
+            <!-- Speak Button (Speaker Icon) -->
+            <button id="speakButton" class="
+                absolute right-3 top-1/2 transform -translate-y-1/2
+                bg-pink-300 hover:bg-pink-400
+                text-pink-800 p-2 rounded-full shadow-md
+                focus:outline-none focus:ring-2 focus:ring-pink-500
+                transition-all duration-200 ease-in-out
+                disabled:opacity-50 disabled:cursor-not-allowed
+            " title="อ่านออกเสียง">
+                <!-- Speaker SVG Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd" d="M9.375 7.5a.75.75 0 0 0-.75.75v3c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V8.25a.75.75 0 0 0-.75-.75h-1.5Z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M12.919 4.041a.75.75 0 0 0-1.031.258c-.183.398-.646.54-1.044.357A4.477 4.477 0 0 0 9.75 4.5v15c0 .355.297.643.649.691.569.076 1.054-.378 1.054-1.042V17.25c3.081-.665 5.37-3.414 5.37-6.75S16.001 5.342 12.919 4.041ZM12 6a.75.75 0 0 0-.75.75V15a.75.75 0 0 0 .75.75h.008a.75.75 0 0 0 .75-.75V6.75A.75.75 0 0 0 12 6Z" clip-rule="evenodd" />
+                    <path d="M7.818 2.576a.75.75 0 0 1 .425.992 8.925 8.925 0 0 0-.25 4.148.75.75 0 0 1-1.391-.564 7.425 7.425 0 0 1 .222-3.693.75.75 0 0 1 .894-.883ZM16.182 2.576a.75.75 0 0 0-.894-.883 7.425 7.425 0 0 1 .222 3.693.75.75 0 0 0 1.391-.564 8.925 8.925 0 0 0-.25-4.148.75.75 0 0 0-.425-.992ZM2.25 10.5a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-.75.75H3a.75.75 0 0 1-.75-.75v-3ZM21.75 10.5a.75.75 0 0 1-.75-.75h-.008a.75.75 0 0 1-.75.75v3a.75.75 0 0 1 .75.75h.008a.75.75 0 0 1 .75-.75v-3Z" />
+                </svg>
+            </button>
+        </div>
+
 
     </div>
 
@@ -177,12 +196,49 @@
         // Get the button and display area elements
         const complimentButton = document.getElementById('complimentButton');
         const complimentDisplay = document.getElementById('complimentDisplay');
+        const speakButton = document.getElementById('speakButton'); // Get the new speak button
+
+        // Initial state for the speak button
+        speakButton.disabled = true; // Disable until a compliment is displayed
+
+        /**
+         * Function to speak the given text using Web Speech API.
+         * @param {string} text - The text to be spoken.
+         */
+        function speakText(text) {
+            // Check if speech synthesis is supported by the browser
+            if ('speechSynthesis' in window) {
+                // Stop any ongoing speech to prevent overlapping
+                window.speechSynthesis.cancel();
+
+                // Create a new speech utterance
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'th-TH'; // Set language to Thai for better pronunciation
+
+                // Optional: You can adjust voice, pitch, and rate if needed
+                // utterance.voice = window.speechSynthesis.getVoices().find(voice => voice.lang === 'th-TH');
+                // utterance.pitch = 1; // 0 to 2, default is 1
+                // utterance.rate = 1;  // 0.1 to 10, default is 1
+
+                // Speak the utterance
+                window.speechSynthesis.speak(utterance);
+            } else {
+                console.warn('Web Speech API is not supported in this browser.');
+                // Fallback for browsers that don't support speech synthesis
+                // You could add a visual message to the user here
+            }
+        }
 
         /**
          * Event listener for the compliment button click.
          * When clicked, it selects a random compliment and displays it.
          */
         complimentButton.addEventListener('click', () => {
+            // Stop any ongoing speech when a new compliment is generated
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+
             // Get a random index from the compliments array
             const randomIndex = Math.floor(Math.random() * compliments.length);
             // Get the compliment at the random index
@@ -190,11 +246,25 @@
             // Display the chosen compliment in the display area
             complimentDisplay.textContent = randomCompliment;
 
+            // Enable the speak button once a compliment is displayed
+            speakButton.disabled = false;
+
             // Optional: Add a subtle animation/effect on compliment display
             complimentDisplay.classList.add('animate-pulse-once'); // Add a class for animation
             setTimeout(() => {
                 complimentDisplay.classList.remove('animate-pulse-once'); // Remove after animation
             }, 500); // Adjust duration as needed
+        });
+
+        /**
+         * Event listener for the speak button click.
+         * When clicked, it reads the currently displayed compliment.
+         */
+        speakButton.addEventListener('click', () => {
+            const currentCompliment = complimentDisplay.textContent;
+            if (currentCompliment && currentCompliment !== "คลิกปุ่มเพื่อรับข้อความน่ารักๆ!") { // Don't try to read the initial message
+                speakText(currentCompliment);
+            }
         });
     </script>
 </body>
