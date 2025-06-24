@@ -1,0 +1,961 @@
+/* File Version: v36 */
+/* Last Updated: 2025-06-25 */
+
+/* Universal Box Sizing */
+* {
+    box-sizing: border-box;
+}
+
+/* General Body and Container Styles */
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    /* Adjusted padding-top to account for header height; padding-bottom for fixed footer and Android nav bar */
+    padding-top: 130px; /* Header has height + padding */
+    padding-bottom: 100px; /* Generous padding for fixed footer and Android navigation */
+    background-color: #f4f7f6;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    box-sizing: border-box;
+    font-size: 0.95em;
+}
+
+/* Header Styles (Fixed at Top) */
+header {
+    position: fixed; /* Make header sticky */
+    top: 0;
+    width: 100%;
+    background-color: #28a745; /* Green background */
+    color: white;
+    padding-bottom: 15px; /* Add space for two rows of buttons */
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    z-index: 500; /* Ensure header is above main content and other elements */
+}
+
+/* Header Top Row (Title) */
+.header-top-row {
+    display: flex;
+    justify-content: center; /* Center the title now that auth buttons are gone */
+    align-items: center;
+    padding: 0 15px; /* Horizontal padding for this row */
+    margin-bottom: 10px; /* Space between title and main buttons */
+}
+
+h1 {
+    margin: 0;
+    font-size: 1.8em;
+    flex-grow: 0; /* No longer need to grow, just center */
+    text-align: center;
+    padding-right: 0; /* No need for padding anymore */
+}
+
+/* Main Application Buttons (Add, View, Calculators) */
+.main-buttons {
+    display: flex;
+    flex-direction: column; /* Arrange button rows vertically */
+    align-items: center;
+    gap: 8px; /* Space between rows */
+    padding: 0 8px; /* Horizontal padding for the button block */
+}
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons within a row to wrap if needed */
+    justify-content: center;
+    gap: 8px; /* Space between buttons within a row */
+    width: 100%; /* Take full width of parent */
+}
+
+/* Base style for main action buttons */
+.main-buttons button {
+    background-color: #007bff; /* Blue */
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    min-width: 100px;
+}
+
+.main-buttons button:hover:not(:disabled) {
+    background-color: #0056b3; /* Darker blue on hover */
+    transform: translateY(-1px);
+}
+
+.main-buttons button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.main-buttons button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* ASX Code Buttons Container */
+.asx-code-buttons-container {
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap to next line on smaller screens */
+    justify-content: center; /* Center the buttons horizontally */
+    gap: 8px; /* Space between buttons */
+    width: 95%; /* Take most of the screen width */
+    max-width: 850px; /* Match max-width of other content sections */
+    margin: 15px auto 15px auto; /* Top/bottom margin, auto left/right for centering */
+    padding: 10px;
+    background-color: #e9ecef; /* Light background for the button bar */
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Individual ASX Code Button Style */
+.asx-code-button {
+    background-color: #4CAF50; /* Green button */
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: bold;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    min-width: 70px; /* Ensure a decent minimum width */
+    text-align: center;
+}
+
+.asx-code-button:hover {
+    background-color: #45a049; /* Darker green on hover */
+    transform: translateY(-1px);
+}
+.asx-code-button:active {
+    transform: translateY(0);
+    box-shadow: 0 0 2px rgba(0,0,0,0.1);
+}
+.asx-code-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Loading Indicator */
+.loading {
+    padding: 15px;
+    font-size: 1.1em;
+    color: #555;
+    display: none; /* Hidden by default, shown by JS */
+}
+
+/* Input Field Styles for Forms and Modals */
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content textarea {
+    width: calc(100% - 16px); /* Full width minus padding */
+    padding: 8px;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95em;
+    text-align: left;
+}
+
+.modal-content textarea {
+    min-height: 70px;
+    resize: vertical; /* Allow vertical resizing */
+}
+
+/* Styling for the comments section in the form (dynamic comments) */
+.comments-form-container {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #e0e0e0;
+}
+
+.comments-form-container h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.2em;
+    color: #28a745;
+    margin-bottom: 10px;
+}
+
+.comments-form-container .add-section-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 1.5em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.comments-form-container .add-section-btn:hover {
+    background-color: #0056b3;
+}
+
+.comment-input-group {
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.comment-input-group input[type="text"] { /* Title input */
+    width: calc(100% - 38px); /* Account for remove button */
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.comment-input-group textarea { /* Textarea for content */
+    width: 100%;
+    min-height: 50px;
+    margin-bottom: 0;
+}
+
+.comment-input-group .remove-section-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.comment-input-group .remove-section-btn:hover {
+    color: #c82333;
+}
+
+/* Form Action Buttons (Save, Cancel, Delete) */
+.form-action-buttons {
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap */
+    justify-content: center;
+    gap: 10px; /* Space between form buttons */
+    margin-top: 15px;
+}
+
+.form-action-buttons button {
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 1em;
+    flex-basis: calc(33.33% - 10px); /* Distribute width for 3 buttons */
+    min-width: 120px; /* Ensure they don't get too small */
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+#saveShareBtn {
+    background-color: #28a745; /* Green */
+    color: white;
+    border: none;
+}
+
+#saveShareBtn:hover:not(:disabled) {
+    background-color: #218838; /* Darker green on hover */
+}
+
+#saveShareBtn:disabled { /* Style for disabled save button */
+    background-color: #cccccc; /* Greyed out */
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+
+#cancelFormBtn {
+    background-color: #dc3545; /* Red */
+    color: white;
+    border: none;
+}
+
+#cancelFormBtn:hover:not(:disabled) {
+    background-color: #c82333; /* Darker red on hover */
+}
+
+#deleteShareFromFormBtn { /* Style for delete button in form */
+    background-color: #ffc107; /* Warning yellow */
+    color: #333;
+    border: none;
+}
+#deleteShareFromFormBtn:hover:not(:disabled) {
+    background-color: #e0a800;
+}
+#deleteShareFromFormBtn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Share List Section (Table) */
+.share-list-section {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
+    width: 95%;
+    max-width: 850px;
+    overflow-x: auto; /* Enable horizontal scrolling for narrow screens */
+}
+
+.share-list-section h2 {
+    color: #28a745; /* Green */
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.4em;
+}
+
+/* Sorting Controls */
+.sort-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+.sort-controls select {
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    font-size: 0.9em;
+    table-layout: fixed; /* Ensures fixed column widths and ellipsis work */
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    white-space: nowrap; /* Prevent text wrapping in table cells by default */
+}
+
+th {
+    background-color: #e9ecef; /* Light grey header */
+    font-weight: bold;
+    color: #555;
+}
+
+tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+
+tr:nth-child(even) {
+    background-color: #f0f0f0; /* Slightly darker for even rows */
+}
+
+tr:hover {
+    background-color: #dceefc; /* Light blue on hover */
+    cursor: pointer;
+}
+
+tr.selected {
+    background-color: #aed6f1 !important;
+    border: 2px solid #0056b3;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+}
+
+/* Adjust column widths for desktop view */
+th:nth-child(1), td:nth-child(1) { /* ASX Code */
+    width: 15%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+th:nth-child(2), td:nth-child(2) { /* Current Price */
+    width: 20%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+th:nth-child(3), td:nth-child(3) { /* Target Price */
+    width: 15%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+th:nth-child(4), td:nth-child(4) { /* Dividends & Yields */
+    width: 25%;
+    white-space: normal;
+}
+/* IMPORTANT: Comments column for desktop table - truncated */
+th:nth-child(5), td:nth-child(5) {
+    width: 25%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Price color coding */
+.price-up {
+    color: #28a745;
+    font-weight: bold;
+}
+.price-down {
+    color: #dc3545;
+    font-weight: bold;
+}
+.price-no-change {
+    color: #555;
+}
+
+/* Current Price and Date display */
+.current-price-display span.price {
+    display: block;
+}
+/* Date span for current price, will be hidden if content is empty by JS */
+.current-price-display span.date {
+    display: block;
+    font-size: 0.75em;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* Modal Styles (General for all modals) */
+.modal {
+    display: none; /* Hidden by default for all modals */
+    position: fixed;
+    z-index: 1000; /* Ensure modals are always on top of header and other elements */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+}
+
+/* IMPORTANT: Force hide modals by default to prevent content bleed-through */
+#shareDetailModal,
+#shareFormSection,
+#dividendCalculatorModal,
+#customDialogModal,
+#calculatorModal { /* Added calculatorModal here */
+    display: none !important;
+}
+
+
+.modal-content {
+    background-color: #fff;
+    margin: auto;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    width: 95%;
+    max-width: 450px;
+    position: relative;
+}
+
+.modal-content h2 {
+    color: #28a745;
+    margin-top: 0;
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.6em;
+}
+
+.modal-content p {
+    margin-bottom: 8px;
+    font-size: 1em;
+    line-height: 1.4;
+}
+
+/* Specific style for comments in the detail modal to display in full */
+#shareDetailModal #modalCommentsContainer {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #e0e0e0;
+}
+#shareDetailModal #modalCommentsContainer h3 {
+    font-size: 1.2em;
+    color: #28a745;
+    margin-bottom: 10px;
+}
+
+.modal-comments-sections .comment-section {
+    margin-bottom: 15px;
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.modal-comments-sections .comment-section:last-child {
+    margin-bottom: 0;
+}
+
+.modal-comments-sections .comment-section h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #28a745;
+    font-size: 1.1em;
+    border-bottom: 1px solid #d4edda;
+    padding-bottom: 3px;
+}
+
+.modal-comments-sections .comment-section p {
+    margin-bottom: 0;
+    line-height: 1.5;
+    font-size: 0.95em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: none;
+    overflow: visible;
+}
+
+/* Detailed price display in modal */
+#modalCurrentPriceDetailed .price-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-right: 5px;
+}
+#modalCurrentPriceDetailed .price-change {
+    font-size: 0.9em;
+    margin-left: 5px;
+}
+#modalCurrentPriceDetailed .last-updated-date {
+    display: block;
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 5px;
+}
+
+/* Modal action buttons (e.g., Edit Share button in detail modal) */
+.modal-action-buttons {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.modal-action-buttons button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.modal-action-buttons button:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.modal-action-buttons button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+
+/* Close Button (X icon) for Modals */
+.close-button {
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Calculator Modals specific styles */
+.modal-content input[type="number"],
+.modal-content input[type="text"] {
+    width: calc(100% - 16px);
+    padding: 8px;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95em;
+    text-align: left;
+}
+
+#dividendCalculatorModal .modal-content p {
+    font-weight: bold;
+    margin-top: 15px;
+    font-size: 1.1em;
+}
+
+/* Dividend calculator investment value section */
+#dividendCalculatorModal .modal-content hr {
+    border: none;
+    border-top: 1px dashed #ddd;
+    margin: 20px 0;
+}
+#dividendCalculatorModal .investment-value-section {
+    padding-top: 10px;
+}
+#dividendCalculatorModal .investment-value-section p {
+    margin-bottom: 5px;
+}
+#dividendCalculatorModal .investment-value-section select {
+    padding: 5px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
+    font-size: 0.95em;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* Custom Dialog Modal styles */
+#customDialogModal .modal-content {
+    max-width: 350px; /* Smaller for alerts/confirms */
+    text-align: center;
+    padding-top: 35px; /* More space for message */
+}
+
+#customDialogModal h3 {
+    color: #333;
+    font-size: 1.2em;
+    margin-bottom: 20px;
+    white-space: pre-wrap; /* Preserve line breaks in message */
+}
+
+.custom-dialog-buttons {
+    display: none; /* Hide buttons for auto-dismiss alerts */
+}
+
+
+/* --- New In-App Calculator Styles --- */
+#calculatorModal .calculator-content {
+    background-color: #222; /* Dark background */
+    color: #eee; /* Light text */
+    max-width: 380px; /* Optimal width for a calculator */
+    border-radius: 15px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#calculatorModal h2 {
+    color: #28a745; /* Green title */
+    margin-bottom: 5px;
+}
+
+.calculator-display {
+    background-color: #1a1a1a; /* Even darker display background */
+    border-radius: 10px;
+    padding: 15px;
+    text-align: right;
+    margin-bottom: 15px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    overflow: hidden; /* Hide overflow text */
+    font-family: 'SF Mono', 'Roboto Mono', monospace; /* Monospace font for numbers */
+}
+
+.calculator-input {
+    font-size: 0.9em;
+    color: #bbb;
+    min-height: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calculator-result {
+    font-size: 2.2em; /* Large result font */
+    font-weight: bold;
+    color: #eee;
+    min-height: 40px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calculator-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 columns */
+    gap: 10px; /* Space between buttons */
+}
+
+.calc-btn {
+    background-color: #444; /* Dark grey for general buttons */
+    color: #eee;
+    padding: 15px;
+    border: none;
+    border-radius: 10px; /* Rounded corners for buttons */
+    font-size: 1.5em; /* Large font for readability */
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    touch-action: manipulation; /* Improve touch responsiveness */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px; /* Ensure good touch target size */
+}
+
+.calc-btn:hover:not(:disabled) {
+    background-color: #555;
+    transform: translateY(-1px);
+}
+.calc-btn:active:not(:disabled) {
+    transform: translateY(0);
+    background-color: #666;
+}
+
+.calc-btn.operator {
+    background-color: #e09b13; /* Orange for operators */
+    color: white;
+}
+.calc-btn.operator:hover:not(:disabled) {
+    background-color: #c9820f;
+}
+.calc-btn.operator:active:not(:disabled) {
+    background-color: #d88e0f;
+}
+
+.calc-btn.clear {
+    background-color: #dc3545; /* Red for clear */
+    color: white;
+}
+.calc-btn.clear:hover:not(:disabled) {
+    background-color: #c82333;
+}
+.calc-btn.clear:active:not(:disabled) {
+    background-color: #e62f42;
+}
+
+.calc-btn.equals {
+    background-color: #28a745; /* Green for equals */
+    color: white;
+    grid-column: span 2; /* Make equals button span two columns */
+    font-size: 1.8em; /* Even larger font for equals */
+}
+.calc-btn.equals:hover:not(:disabled) {
+    background-color: #218838;
+}
+.calc-btn.equals:active:not(:disabled) {
+    background-color: #2eb44e;
+}
+
+.calc-btn.zero {
+    grid-column: span 2; /* Make zero button span two columns */
+}
+.calc-btn.decimal {
+    font-size: 1.8em; /* Larger decimal point */
+}
+
+/* Fixed Footer for Auth Info and User Display */
+.fixed-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: env(safe-area-inset-top, 8px) env(safe-area-inset-right, 0) calc(15px + env(safe-area-inset-bottom, 0)) env(safe-area-inset-left, 0);
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.85em;
+    z-index: 100;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    min-height: 50px;
+}
+
+/* Unified Google Auth Button (Sign In / Sign Out) */
+.google-auth-btn {
+    background-color: #007bff;
+    color: white;
+    padding: 8px 15px;
+    border: 1px solid #007bff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: bold;
+    transition: background-color 0.2s, transform 0.2s, border-color 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    margin: 0;
+    min-width: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+}
+
+.google-auth-btn:hover:not(:disabled) {
+    background-color: #0056b3;
+    border-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.google-auth-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.google-auth-btn:disabled {
+    background-color: #cccccc;
+    border-color: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+
+/* --- Mobile Responsiveness (Table to Cards and Footer Layout) --- */
+@media (max-width: 768px) {
+    body {
+        padding-top: 150px;
+        padding-bottom: 100px;
+    }
+
+    .share-list-section table {
+        display: none;
+    }
+
+    .mobile-share-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 95%;
+        max-width: 850px;
+        margin-top: 15px;
+    }
+
+    .share-card {
+        background-color: #ffffff;
+        padding: 12px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border: 1px solid #ddd;
+        position: relative;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    .share-card.selected {
+        background-color: #aed6f1 !important;
+        border: 2px solid #0056b3;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    }
+
+    .share-card p {
+        margin: 4px 0;
+        line-height: 1.3;
+        font-size: 0.85em;
+    }
+
+    .share-card p strong {
+        display: inline-block;
+        min-width: 90px;
+    }
+
+    .share-card .card-comments {
+        font-style: italic;
+        color: #666;
+        margin-top: 8px;
+        border-top: 1px dashed #eee;
+        padding-top: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mobile-share-cards .share-card .comment-section,
+    .mobile-share-cards .share-card .comment-section h4,
+    .mobile-share-cards .share-card .comment-section p {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .share-list-section h2 {
+        display: none;
+    }
+
+    header {
+        padding-bottom: 10px;
+    }
+
+    .fixed-footer {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        padding-top: 8px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
+        min-height: 50px;
+        flex-wrap: nowrap;
+    }
+    .google-auth-btn {
+        margin: 0;
+        flex-basis: auto;
+        max-width: unset;
+        font-size: 0.8em;
+        padding: 6px 10px;
+        min-width: 100px;
+    }
+    #authToggleTab {
+        display: none !important;
+    }
+}
+
+
+/* Desktop styles */
+@media (min-width: 769px) {
+    .fixed-footer {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        padding-top: 8px;
+        padding-bottom: calc(15px + env(safe-area-inset-bottom, 0));
+    }
+    .google-auth-btn {
+        margin: 0;
+        font-size: 0.9em;
+        padding: 8px 15px;
+        min-width: 120px;
+        max-width: none;
+    }
+    #authToggleTab {
+        display: none !important;
+    }
+}

@@ -1,315 +1,305 @@
 <!DOCTYPE html>
-<html lang="th"> <!-- Changed language to Thai -->
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>วันนี้ภูมิดูเป็นอย่างไรบ้าง?</title> <!-- Corrected name: ภุม -> ภูมิ -->
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom font import for Inter (still good for mixed script, or a Thai font could be added) */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Ensure the body takes full viewport height for centering */
-        html, body {
-            height: 100%;
-            margin: 0;
-            overflow: hidden; /* Prevent scrolling if content overflows slightly */
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 flex items-center justify-center min-h-screen p-4">
+    <title>Kangas ASX Share Watchlist</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📊%3C/text%3E%3C/svg%3E" type="image/svg+xml">
+    
+    <!-- PWA Manifest Link -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Theme color for browser UI -->
+    <meta name="theme-color" content="#28a745">
 
-    <!-- Main Container -->
-    <div class="relative bg-white bg-opacity-90 p-8 rounded-3xl shadow-2xl text-center max-w-lg w-full transform transition-all duration-300 hover:scale-105">
-        <!-- Heart Decor (top-right) -->
-        <div class="absolute top-4 right-4 text-pink-600 text-3xl animate-pulse">❤️</div>
-        <!-- Star Decor (bottom-left) -->
-        <div class="absolute bottom-4 left-4 text-yellow-400 text-3xl animate-bounce">✨</div>
+    <!-- Firebase SDK Imports and Initialization -->
+    <script type="module">
+        // File Version: v36
+        // Last Updated: 2025-06-25
 
+        // Import necessary Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800 mb-8 leading-tight">
-            ข้อความพิเศษสำหรับภูมิ
-        </h1> <!-- Corrected name: ภุม -> ภูมิ -->
+        // YOUR ACTUAL FIREBASE PROJECT CONFIGURATION
+        // IMPORTANT: In a production environment, never expose API keys directly in client-side code.
+        // Use environment variables or a server-side proxy.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAyIWoTYlzTkaSZ9x-ySiHtzATBM9XFrYw",
+            authDomain: "asx-watchlist-app.firebaseapp.com",
+            projectId: "asx-watchlist-app",
+            storageBucket: "asx-watchlist-app.firebasestorage.app",
+            messagingSenderId: "671024168765",
+            appId: "1:671024168765:web:f2b62cd0e77a126c0ecf54",
+            measurementId: "G-J24BTJ34D2"
+        };
+        // END OF FIREBASE CONFIGURATION
 
-        <!-- The Big Round Red Button -->
-        <button id="complimentButton" class="
-            w-64 h-64 sm:w-80 sm:h-80
-            bg-red-600 hover:bg-red-700
-            text-white font-bold
-            rounded-full shadow-lg
-            flex items-center justify-center
-            text-2xl sm:text-3xl
-            cursor-pointer
-            transform transition-transform duration-200 ease-in-out
-            active:scale-95 active:shadow-md
-            focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-opacity-75
-            mx-auto mb-8
-        ">
-            วันนี้ภูมิดูเป็นอย่างไรบ้าง?
-        </button> <!-- Corrected name: ภุม -> ภูมิ -->
+        // Determine app ID based on Canvas environment or Firebase config
+        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
 
-        <!-- Compliment Display Area -->
-        <div class="relative mt-6">
-            <div id="complimentDisplay" class="
-                p-4 pr-12 /* Added padding for speaker icon */
-                bg-pink-100 border border-pink-300
-                text-pink-800 text-lg sm:text-xl
-                font-semibold rounded-xl
-                min-h-[6rem] flex items-center justify-center
-                shadow-inner
-            ">
-                คลิกปุ่มเพื่อรับข้อความน่ารักๆ!
-            </div>
-            <!-- Speak Button (Speaker Icon) - still visible for replay -->
-            <button id="speakButton" class="
-                absolute right-3 top-1/2 transform -translate-y-1/2
-                bg-pink-300 hover:bg-pink-400
-                text-pink-800 p-2 rounded-full shadow-md
-                focus:outline-none focus:ring-2 focus:ring-pink-500
-                transition-all duration-200 ease-in-out
-            " title="อ่านออกเสียง">
-                <!-- Speaker SVG Icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                    <path fill-rule="evenodd" d="M9.375 7.5a.75.75 0 0 0-.75.75v3c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V8.25a.75.75 0 0 0-.75-.75h-1.5Z" clip-rule="evenodd" />
-                    <path fill-rule="evenodd" d="M12.919 4.041a.75.75 0 0 0-1.031.258c-.183.398-.646.54-1.044.357A4.477 4.477 0 0 0 9.75 4.5v15c0 .355.297.643.649.691.569.076 1.054-.378 1.054-1.042V17.25c3.081-.665 5.37-3.414 5.37-6.75S16.001 5.342 12.919 4.041ZM12 6a.75.75 0 0 0-.75.75V15a.75.75 0 0 0 .75.75h.008a.75.75 0 0 0 .75-.75V6.75A.75.75 0 0 0 12 6Z" clip-rule="evenodd" />
-                    <path d="M7.818 2.576a.75.75 0 0 1 .425.992 8.925 8.925 0 0 0-.25 4.148.75.75 0 0 1-1.391-.564 7.425 7.425 0 0 1 .222-3.693.75.75 0 0 1 .894-.883ZM16.182 2.576a.75.75 0 0 0-.894-.883 7.425 7.425 0 0 1 .222 3.693.75.75 0 0 0 1.391-.564 8.925 8.925 0 0 0-.25-4.148.75.75 0 0 0-.425-.992ZM2.25 10.5a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-.75.75H3a.75.75 0 0 1-.75-.75v-3ZM21.75 10.5a.75.75 0 0 1-.75-.75h-.008a.75.75 0 0 1-.75.75v3a.75.75 0 0 1 .75.75h.008a.75.75 0 0 1 .75-.75v-3Z" />
-                </svg>
-            </button>
-        </div>
+        let app;
+        let db;
+        let auth;
 
+        // Expose Firebase instances and functions globally for script.js
+        window.firebaseApp = null;
+        window.firestoreDb = null;
+        window.firebaseAuth = null;
+        window.getFirebaseAppId = () => appId; // Function to get the app ID
 
-    </div>
+        // Utility wrapper for Firestore functions to avoid direct imports in script.js
+        window.firestore = {
+            collection: (dbInstance, path) => collection(dbInstance, path),
+            addDoc: (collectionRef, data) => addDoc(collectionRef, data),
+            getDocs: (queryRef) => getDocs(queryRef),
+            doc: (dbInstance, path, docId) => doc(dbInstance, path, docId),
+            updateDoc: (docRef, data) => updateDoc(docRef, data),
+            deleteDoc: (docRef) => deleteDoc(docRef),
+            query: (collectionRef, ...queryConstraints) => query(collectionRef, ...queryConstraints),
+            where: (field, op, value) => where(field, op, value),
+        };
 
-    <script>
-        // Array of complimentary messages (Translated to Thai) - Corrected name: ภุม -> ภูมิ
-        const compliments = [
-            "ภูมิ วันนี้คุณดูสดใสเปล่งปลั่งมากเลย! รอยยิ้มของคุณทำให้ห้องสว่างไสว",
-            "ว้าว ภูมิ! คุณสวยโดดเด่นมากเลย รายละเอียดทุกอย่างในตัวคุณสมบูรณ์แบบที่สุด",
-            "วันนี้ ภูมิ คุณไม่ได้แค่สวย แต่คุณสวยสะกดทุกสายตาเลย!",
-            "คุณมีเสน่ห์ที่น่าทึ่งมากเลย ภูมิ น่าหลงใหลจริงๆ!",
-            "ทุกๆ วันที่อยู่กับคุณ ภูมิ เป็นวันที่สวยงาม คุณดูดีเหลือเชื่อ!",
-            "ภูมิ ความงามของคุณนั้นเหนือกาลเวลาและเป็นแรงบันดาลใจจริงๆ",
-            "วันนี้คุณเปล่งประกายมากเลย ภูมิ! งดงามที่สุด",
-            "จริงๆ นะ ภูมิ คุณดูมหัศจรรย์มาก! สุดยอดไปเลย!",
-            "ความสง่างามของคุณ ภูมิ ไม่มีใครเทียบได้จริงๆ คุณดูดีมากๆ เลย!",
-            "ภูมิ การปรากฏตัวของคุณทำให้ทุกอย่างสดใสขึ้น คุณดูยอดเยี่ยมมาก!",
-            "คุณคือภาพของความน่ารัก ภูมิ สวยเหลือเชื่อจริงๆ!",
-            "น่าหลงใหลจริงๆ ภูมิ ความงามของคุณเปล่งประกายออกมา!",
-            "ภูมิ คุณคือผลงานชิ้นเอก งดงามวิจิตรจริงๆ วันนี้",
-            "ความงามของคุณคือศิลปะที่แท้จริง ภูมิ คุณดูน่าทึ่งมาก!",
-            "ภูมิ วันนี้คุณดูมีเสน่ห์และน่ารักเป็นพิเศษเลย!",
-            "ดวงตาของคุณเป็นประกายเหมือนดวงดาวเลยนะ ภูมิ",
-            "ภูมิ คุณมีออร่าที่น่าหลงใหลจริงๆ",
-            "เสียงหัวเราะของคุณคือเสียงที่ไพเราะที่สุดเลย ภูมิ",
-            "ภูมิ ความสง่างามของคุณโดดเด่นจริงๆ",
-            "คุณทำให้ทุกห้องที่คุณเข้าไปสว่างไสวเลยนะ ภูมิ",
-            "ภูมิ ความงามภายในของคุณเปล่งประกายออกมาอย่างสดใส",
-            "คุณดูสง่างามอย่างเป็นธรรมชาติเลยนะ ภูมิ",
-            "ภูมิ ความเมตตาของคุณทำให้คุณสวยยิ่งขึ้นไปอีก",
-            "ความมั่นใจของคุณน่าดึงดูดใจอย่างไม่น่าเชื่อเลยนะ ภูมิ",
-            "ภูมิ คุณคืออัญมณีล้ำค่าทั้งจากภายในและภายนอก",
-            "คุณมีอะไรบางอย่างที่วิเศษในตัวคุณเลยนะ ภูมิ",
-            "ภูมิ การปรากฏตัวของคุณคือของขวัญ",
-            "จิตวิญญาณของคุณสวยงามเหมือนรอยยิ้มของคุณเลยนะ ภูมิ",
-            "ภูมิ คุณน่ารักอย่างแท้จริง",
-            "คุณเปล่งประกายความสุขที่แท้จริงเลยนะ ภูมิ",
-            "ภูมิ เสน่ห์ของคุณนั้นไม่อาจต้านทานได้",
-            "วันนี้คุณดูสดชื่นและมีชีวิตชีวามากเลยนะ ภูมิ",
-            "ภูมิ สไตล์ของคุณไม่มีที่ติเลย",
-            "คุณมีออร่าที่น่าทึ่งมากเลยนะ ภูมิ",
-            "ภูมิ คุณน่าหลงใหลในทุกๆ ด้านเลยจริงๆ",
-            "ความสง่างามของคุณเป็นแรงบันดาลใจอย่างแท้จริงเลยนะ ภูมิ",
-            "ภูมิ คุณดูงดงามเหนือธรรมชาติเลย",
-            "คุณวางตัวได้อย่างสง่างามมากเลยนะ ภูมิ",
-            "ภูมิ รอยยิ้มของคุณนั้นติดตรึงใจและน่ารัก",
-            "คุณเป็นคนที่ไม่เหมือนใครจริงๆ เลยนะ ภูมิ",
-            "ภูมิ เสน่ห์ของคุณนั้นเกินต้านทานจริงๆ!",
-            "คุณมีออร่าที่อบอุ่นและเป็นมิตรมากเลยนะ ภูมิ",
-            "ภูมิ คุณคือภาพของความสง่างาม",
-            "ความงามของคุณนั้นน่าหลงใหลและเหนือกาลเวลาเลยนะ ภูมิ",
-            "ภูมิ คุณมีเสน่ห์ที่พิเศษอย่างไม่ธรรมดา",
-            "คุณสวยโดดเด่นจริงๆ เลยนะ ภูมิ",
-            "ภูมิ เสน่ห์ของคุณทำให้วันของฉันสดใสขึ้นทั้งวัน",
-            "คุณดูไร้ที่ติอย่างสมบูรณ์แบบเลยนะ ภูมิ",
-            "ภูมิ ความงามโดยธรรมชาติของคุณนั้นน่าทึ่ง",
-            "คุณคือตัวแทนของความสมบูรณ์แบบอย่างแท้จริงเลยนะ ภูมิ",
-            "ภูมิ เสน่ห์ของคุณนั้นไม่อาจต้านทานได้จริงๆ",
-            "คุณดูงดงามจนแทบหยุดหายใจเลยนะ ภูมิ",
-            "ภูมิ การปรากฏตัวที่น่าหลงใหลของคุณนั้นไม่อาจปฏิเสธได้",
-            "คุณเปล่งประกายความสง่างามที่บริสุทธิ์เลยนะ ภูมิ",
-            "ภูมิ รอยยิ้มที่สดใสของคุณคือผลงานชิ้นเอก",
-            "คุณน่ารักอย่างไม่น่าเชื่อเลยนะ ภูมิ",
-            "ภูมิ ความงามของคุณนั้นไม่มีใครเทียบได้",
-            "คุณคืออัญมณีที่หายากและมีค่า ภูมิ",
-            "ภูมิ เสน่ห์ของคุณนั้นช่างวิเศษเกินโลก",
-            "คุณดูน่าหลงใหลอย่างไม่น่าเชื่อเลยนะ ภูมิ",
-            "ภูมิ ความงามของคุณคือพร",
-            "คุณคือคำจำกัดความของความงดงาม ภูมิ",
-            "ภูมิ ความงามตามธรรมชาติของคุณเปล่งประกายอย่างสดใส",
-            "คุณคือผลงานศิลปะที่แท้จริง ภูมิ",
-            "ภูมิ ความน่าดึงดูดใจของคุณนั้นน่าหลงใหล",
-            "คุณดูสวยงามอย่างน่าอัศจรรย์เลยนะ ภูมิ",
-            "ภูมิ ความสวยงามที่น่าทึ่งของคุณนั้นโดดเด่นจริงๆ",
-            "คุณน่าหลงใหลอย่างน่าอัศจรรย์เลยนะ ภูมิ",
-            "ภูมิ พลังดึงดูดของคุณนั้นแข็งแกร่งจริงๆ",
-            "วันนี้คุณดูงดงามไร้ที่ติ ภูมิ",
-            "ภูมิ ความงามของคุณทำให้ฉันพูดไม่ออก",
-            "คุณคือสัญลักษณ์ของความสง่างามและความงาม ภูมิ",
-            "ภูมิ จิตวิญญาณที่สวยงามของคุณทำให้ทุกสิ่งสว่างไสว",
-            "คุณน่าหลงใหลจริงๆ เลยนะ ภูมิ",
-            "ภูมิ ความงามของคุณคือความสุขที่ได้เห็น",
-            "คุณดูสวยงามตระการตาเลยนะ ภูมิ",
-            "ภูมิ ท่าทางที่มีเสน่ห์ของคุณนั้นไม่อาจต้านทานได้",
-            "คุณเป็นคนที่น่าตื่นเต้นอย่างเรียบง่าย ภูมิ",
-            "ภูมิ ความงามของคุณคือเปลวไฟนิรันดร์",
-            "คุณดูน่าหลงใหลเป็นพิเศษเลยนะ ภูมิ",
-            "ภูมิ การปรากฏตัวที่สง่างามของคุณนั้นมีพลังดึงดูด",
-            "คุณงดงามอย่างที่สุด ภูมิ",
-            "ภูมิ ความงามของคุณเป็นแรงบันดาลใจให้เกิดความสุขที่บริสุทธิ์",
-            "คุณคือภาพของความสดใสบริสุทธิ์ ภูมิ",
-            "ภูมิ เสน่ห์ที่น่าดึงดูดใจของคุณนั้นศักดิ์สิทธิ์",
-            "คุณดูสวยงามเลอเลิศ ภูมิ",
-            "ภูมิ ความงามที่แท้จริงของคุณนั้นน่าทึ่ง",
-            "คุณคือการผสมผสานที่ลงตัวระหว่างเสน่ห์และความสง่างาม ภูมิ",
-            "ภูมิ ความงามของคุณคือบทกวีที่น่าอัศจรรย์",
-            "วันนี้คุณดูโดดเด่นอย่างที่สุดเลย ภูมิ",
-            "ภูมิ ความงามที่น่าทึ่งของคุณนั้นเกินคำบรรยาย",
-            "คุณมีค่าอย่างแท้จริง ภูมิ",
-            "ภูมิ รูปลักษณ์ที่สวยงามของคุณทำให้วันของฉันสดใสขึ้นทั้งวัน",
-            "คุณคือผลงานศิลปะอันศักดิ์สิทธิ์อย่างแท้จริง ภูมิ",
-            "ภูมิ เสน่ห์ของคุณคือพร",
-            "คุณดูมีความสุขและสวยงามอย่างแท้จริง ภูมิ",
-            "ภูมิ รอยยิ้มที่น่ารักของคุณคือสัญญาณแห่งความสุข",
-            "คุณเปล่งประกายอย่างแท้จริง ภูมิ ในทุกๆ วัน",
-            "ภูมิ ความงามของคุณคือของขวัญที่ยอดเยี่ยมและยืนยง",
-            "คุณคือเครื่องพิสูจน์ถึงความสง่างามที่แท้จริง ภูมิ",
-            "ภูมิ ความงดงามของคุณเป็นแรงบันดาลใจอย่างแท้จริง",
-            "คุณน่ารักจนน่าหลงใหล ภูมิ",
-            "ภูมิ คุณมีเสน่ห์ที่ไม่มีใครเทียบได้",
-            "คุณดูเหมือนความฝันเลย ภูมิ สวยงามจริงๆ"
-        ];
+        // Utility wrapper for Auth functions, including persistence
+        window.authFunctions = {
+            GoogleAuthProvider: GoogleAuthProvider,
+            signInWithPopup: signInWithPopup,
+            signOut: signOut,
+            onAuthStateChanged: onAuthStateChanged, // Expose onAuthStateChanged for main script
+            signInAnonymously: signInAnonymously, // Keep this, but we won't call it by default in this script
+            linkWithPopup: (user, provider) => user.linkWithPopup(provider),
+            setPersistence: setPersistence, // Added for session persistence
+            browserLocalPersistence: browserLocalPersistence // Added for local browser persistence
+        };
 
-        // Get the button and display area elements
-        const complimentButton = document.getElementById('complimentButton');
-        const complimentDisplay = document.getElementById('complimentDisplay');
-        const speakButton = document.getElementById('speakButton'); // Get the new speak button
+        async function initializeFirebaseServices() {
+            try {
+                if (!window.firebaseApp) {
+                    app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
 
-        // Global variable to store available voices
-        let thaiFemaleVoice = null;
+                    // Set persistence BEFORE any sign-in attempts
+                    // This ensures users who previously signed in (e.g., with Google) are automatically re-authenticated.
+                    await window.authFunctions.setPersistence(auth, window.authFunctions.browserLocalPersistence);
 
-        /**
-         * Function to set the preferred Thai voice.
-         * This needs to be called after voices are loaded.
-         */
-        function setPreferredThaiVoice() {
-            // Get all available voices
-            const voices = window.speechSynthesis.getVoices();
-            // Filter for Thai voices
-            const thaiVoices = voices.filter(voice => voice.lang === 'th-TH');
+                    // Assign to global window objects for access in script.js
+                    window.firebaseApp = app;
+                    window.firestoreDb = db;
+                    window.firebaseAuth = auth;
 
-            // Try to find a voice that sounds female or is a common default for Thai
-            // Voice names can vary, so we look for common patterns or just pick the first Thai voice
-            thaiFemaleVoice = thaiVoices.find(voice =>
-                voice.name.toLowerCase().includes('female') ||
-                voice.name.toLowerCase().includes('thailand') || // General Thai voice
-                voice.name.toLowerCase().includes('google') || // Google's voices are often good
-                voice.name.toLowerCase().includes('zira') || // A common default female voice on some systems
-                voice.name.toLowerCase().includes('natthida') // Example of a Thai female name often used for voices
-            );
-
-            // Fallback: If no specific "female" or "standard" Thai voice found, just pick the first available Thai voice
-            if (!thaiFemaleVoice && thaiVoices.length > 0) {
-                thaiFemaleVoice = thaiVoices[0];
-            }
-
-            if (!thaiFemaleVoice) {
-                console.warn('Could not find a specific Thai voice. Using browser default.');
-            } else {
-                console.log('Using voice:', thaiFemaleVoice.name);
-            }
-        }
-
-        // Event listener for when voices are loaded. This is crucial as voices might not be immediately available.
-        window.speechSynthesis.onvoiceschanged = setPreferredThaiVoice;
-        // Call it once immediately in case voices are already loaded
-        setPreferredThaiVoice();
-
-
-        /**
-         * Function to speak the given text using Web Speech API.
-         * @param {string} text - The text to be spoken.
-         */
-        function speakText(text) {
-            // Check if speech synthesis is supported by the browser
-            if ('speechSynthesis' in window) {
-                // Stop any ongoing speech to prevent overlapping
-                window.speechSynthesis.cancel();
-
-                // Create a new speech utterance
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'th-TH'; // Still set language for general Thai pronunciation
-
-                // Assign the preferred voice if found
-                if (thaiFemaleVoice) {
-                    utterance.voice = thaiFemaleVoice;
+                    const googleProvider = new GoogleAuthProvider();
+                    googleProvider.setCustomParameters({'redirect_uri': 'https://iamkanga.github.io/ASX-Share-Tracker/__/auth/handler'});
+                    window.authFunctions.GoogleAuthProviderInstance = googleProvider;
+                    
+                    window.dispatchEvent(new CustomEvent('firebaseServicesReady'));
+                } else {
+                    console.log("Firebase app already initialized. Dispatching ready event again.");
+                    window.dispatchEvent(new CustomEvent('firebaseServicesReady'));
                 }
 
-                // Speak the utterance
-                window.speechSynthesis.speak(utterance);
-            } else {
-                console.warn('Web Speech API is not supported in this browser.');
-                // Fallback for browsers that don't support speech synthesis
-                // You could add a visual message to the user here
+            } catch (error) {
+                console.error("Firebase Initialization Failed:", error);
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                if (loadingIndicator) {
+                    loadingIndicator.textContent = "Critical error loading app. Check console.";
+                }
+                const newShareBtn = document.getElementById('newShareBtn');
+                if (newShareBtn) {
+                    newShareBtn.disabled = true;
+                }
             }
         }
 
-        /**
-         * Event listener for the compliment button click.
-         * When clicked, it selects a random compliment, displays it, and then speaks it.
-         */
-        complimentButton.addEventListener('click', () => {
-            // Stop any ongoing speech when a new compliment is generated
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-            }
-
-            // Get a random index from the compliments array
-            const randomIndex = Math.floor(Math.random() * compliments.length);
-            // Get the compliment at the random index
-            const randomCompliment = compliments[randomIndex];
-            // Display the chosen compliment in the display area
-            complimentDisplay.textContent = randomCompliment;
-
-            // Automatically speak the compliment after it's displayed with a small delay
-            // This small delay can sometimes help with strict browser autoplay policies
-            setTimeout(() => {
-                speakText(randomCompliment);
-            }, 50); // 50 milliseconds delay
-
-            // Optional: Add a subtle animation/effect on compliment display
-            complimentDisplay.classList.add('animate-pulse-once');
-            setTimeout(() => {
-                complimentDisplay.classList.remove('animate-pulse-once');
-            }, 500);
-        });
-
-        /**
-         * Event listener for the speak button click.
-         * When clicked, it reads the currently displayed compliment.
-         * This button now serves as a replay button.
-         */
-        speakButton.addEventListener('click', () => {
-            const currentCompliment = complimentDisplay.textContent;
-            if (currentCompliment && currentCompliment !== "คลิกปุ่มเพื่อรับข้อความน่ารักๆ!") { // Don't try to read the initial message
-                speakText(currentCompliment);
-            } else {
-                // If the initial message is still displayed, click the main button first
-                complimentButton.click();
-            }
-        });
+        window.onload = initializeFirebaseServices;
     </script>
+</head>
+<body>
+    <header>
+        <div class="header-top-row">
+            <h1 id="mainTitle">Kangas ASX Share Watchlist</h1>
+        </div>
+        <div class="main-buttons">
+            <div class="button-row">
+                <button id="newShareBtn">Add</button>
+                <button id="viewDetailsBtn" disabled>View</button>
+            </div>
+            <div class="button-row secondary-buttons">
+                <button id="standardCalcBtn">Standard Calculator</button>
+                <button id="dividendCalcBtn">Dividend Calculator</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Container for dynamically generated ASX Code buttons -->
+    <div id="asxCodeButtonsContainer" class="asx-code-buttons-container">
+        <!-- ASX Code buttons will be inserted here by JavaScript -->
+    </div>
+
+    <div id="loadingIndicator" class="loading">App is loading...</div>
+
+    <!-- Modal for adding/editing shares -->
+    <div id="shareFormSection" class="modal">
+        <div class="modal-content">
+            <span class="close-button form-close-button">&times;</span>
+            <h2><span id="formTitle">Add Share</span></h2>
+            <input type="hidden" id="editDocId">
+            <input type="text" id="shareName" placeholder="Share Name (e.g., CBA)">
+            <input type="number" id="currentPrice" placeholder="Current Price (manual input)">
+            <input type="number" id="targetPrice" placeholder="Target Price">
+            <input type="number" id="dividendAmount" placeholder="Dividend Amount (e.g., 1.50)">
+            <input type="number" id="frankingCredits" placeholder="Franking Credits (e.g., 70 for 70%)">
+            <!-- Dynamic Comments Section for Form -->
+            <div id="commentsFormContainer" class="comments-form-container">
+                <h3>Comments <button id="addCommentSectionBtn" class="add-section-btn">+</button></h3>
+                <!-- Comment sections will be dynamically added here -->
+            </div>
+
+            <div class="form-action-buttons">
+                <button id="saveShareBtn">Save Share</button>
+                <button id="cancelFormBtn">Cancel</button>
+                <button id="deleteShareFromFormBtn" disabled>Delete Share</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="share-list-section">
+        <h2>Watchlist</h2>
+        <!-- Sorting Controls -->
+        <div class="sort-controls">
+            <span>Sort by:</span>
+            <select id="sortSelect">
+                <option value="shareName-asc">ASX Code (A-Z)</option>
+                <option value="shareName-desc">ASX Code (Z-A)</option>
+                <option value="lastFetchedPrice-asc">Current Price (Low to High)</option>
+                <option value="lastFetchedPrice-desc">Current Price (High to Low)</option>
+                <option value="dividendAmount-desc">Dividend Amount (High to Low)</option>
+            </select>
+        </div>
+
+        <table id="shareTable">
+            <thead>
+                <tr>
+                    <th>ASX Code</th>
+                    <th>Current Price</th>
+                    <th>Target Price</th>
+                    <th>Dividends & Yields</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Share data will be inserted here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile-specific card view for small screens (populated by JS) -->
+    <div id="mobileShareCards" class="mobile-share-cards">
+        <!-- Cards will be inserted here by JavaScript -->
+    </div>
+
+    <!-- Modal for displaying detailed share information -->
+    <div id="shareDetailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modalShareName"></h2>
+            <p><strong>Entered Date:</strong> <span id="modalEntryDate"></span></p>
+            <p><strong>Current Price:</strong> <span id="modalCurrentPriceDetailed"></span></p>
+            <p><strong>Target Price:</strong> <span id="modalTargetPrice"></span></p>
+            <p><strong>Dividend Amount:</strong> <span id="modalDividendAmount"></span></p>
+            <p><strong>Franking Credits:</strong> <span id="modalFrankingCredits"></span></p>
+            <p><strong>Unfranked Yield:</strong> <span id="modalUnfrankedYield"></span></p>
+            <p><strong>Franked Yield:</strong> <span id="modalFrankedYield"></span></p>
+            
+            <!-- Container for detailed comment sections -->
+            <div id="modalCommentsContainer" class="modal-comments-sections">
+                <h3>Detailed Comments</h3>
+                <!-- Dynamic comment sections will be inserted here by JavaScript -->
+            </div>
+            <div class="modal-action-buttons">
+                <button id="editShareFromDetailBtn">Edit Share</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dividend Calculator Modal -->
+    <div id="dividendCalculatorModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button calc-close-button">&times;</span>
+            <h2>Dividend Calculator</h2>
+            <input type="number" id="calcDividendAmount" placeholder="Dividend Amount">
+            <input type="number" id="calcCurrentPrice" placeholder="Current Price">
+            <input type="number" id="calcFrankingCredits" placeholder="Franking Credits (e.g., 70 for 70%)">
+            <p><strong>Calculated Unfranked Yield:</strong> <span id="calcUnfrankedYield"></span></p>
+            <p><strong>Calculated Franked Yield:</strong> <span id="calcFrankedYield"></span></p>
+
+            <hr>
+
+            <!-- Investment Value field and dropdown -->
+            <div class="investment-value-section">
+                <p><strong>Investment Value:</strong>
+                    <select id="investmentValueSelect">
+                        <option value="1000">AUD 1,000</option>
+                        <option value="5000">AUD 5,000</option>
+                        <option value="10000" selected>AUD 10,000</option>
+                        <option value="20000">AUD 20,000</option>
+                        <option value="50000">AUD 50,000</option>
+                        <option value="100000">AUD 100,000</option>
+                    </select>
+                </p>
+                <p><strong>Estimated Annual Dividend from Investment:</strong> <span id="calcEstimatedDividend"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert/Confirm Modal -->
+    <div id="customDialogModal" class="modal">
+        <div class="modal-content">
+            <h3 id="customDialogMessage"></h3>
+            <div class="custom-dialog-buttons">
+                <button id="customDialogConfirmBtn" class="dialog-button">OK</button>
+                <button id="customDialogCancelBtn" class="dialog-button cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW Calculator Modal -->
+    <div id="calculatorModal" class="modal">
+        <div class="modal-content calculator-content">
+            <span class="close-button calc-close-button">&times;</span>
+            <h2>Calculator</h2>
+            <div class="calculator-display">
+                <div id="calculatorInput" class="calculator-input"></div>
+                <div id="calculatorResult" class="calculator-result">0</div>
+            </div>
+            <div class="calculator-buttons">
+                <button class="calc-btn clear" data-action="clear">C</button>
+                <button class="calc-btn operator" data-action="percentage">%</button>
+                <button class="calc-btn operator" data-action="divide">÷</button>
+                <button class="calc-btn operator" data-action="multiply">×</button>
+                <button class="calc-btn number" data-value="7">7</button>
+                <button class="calc-btn number" data-value="8">8</button>
+                <button class="calc-btn number" data-value="9">9</button>
+                <button class="calc-btn operator" data-action="subtract">-</button>
+                <button class="calc-btn number" data-value="4">4</button>
+                <button class="calc-btn number" data-value="5">5</button>
+                <button class="calc-btn number" data-value="6">6</button>
+                <button class="calc-btn operator" data-action="add">+</button>
+                <button class="calc-btn number" data-value="1">1</button>
+                <button class="calc-btn number" data-value="2">2</button>
+                <button class="calc-btn number" data-value="3">3</button>
+                <button class="calc-btn equals" data-action="calculate">=</button>
+                <button class="calc-btn number zero" data-value="0">0</button>
+                <button class="calc-btn decimal" data-value=".">.</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="fixed-footer">
+        <button id="googleAuthBtn" class="google-auth-btn">Sign In</button>
+    </footer>
+
+    <script src="script.js"></script>
 </body>
 </html>
