@@ -1,4 +1,4 @@
-// File Version: v38
+// File Version: v45
 // Last Updated: 2025-06-25
 
 // This script interacts with Firebase Firestore for data storage.
@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const calcEstimatedDividend = document.getElementById('calcEstimatedDividend'); // New display for estimated dividend
 
     const sortSelect = document.getElementById('sortSelect'); // New sort dropdown
+    const currentWatchlistTitle = document.getElementById('currentWatchlistTitle'); // New element for dynamic watchlist title
 
     // Custom Dialog Modal elements
     const customDialogModal = document.getElementById('customDialogModal');
@@ -75,6 +76,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const calculatorButtons = document.querySelector('.calculator-buttons');
 
 
+    // NEW Watchlist Management elements
+    const watchlistSelect = document.getElementById('watchlistSelect');
+    const addWatchlistBtn = document.getElementById('addWatchlistBtn');
+    const renameWatchlistBtn = document.getElementById('renameWatchlistBtn');
+
+
     // Array of all form input elements for easy iteration and form clearing (excluding dynamic comments)
     const formInputs = [
         shareNameInput, currentPriceInput, targetPriceInput,
@@ -85,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let db;
     let auth;
     let currentUserId = null;
-    let currentAppId;
+    let currentAppId = null; // Initialize as null, will be set from window.getFirebaseAppId()
     let selectedShareDocId = null;
     let allSharesData = []; // Array to hold all loaded share data
     let currentDialogCallback = null; // Stores the function to call after custom dialog closes
@@ -113,8 +120,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let resultDisplayed = false;
 
     // Watchlist state variables
-    const DEFAULT_WATCHLIST_NAME = 'My Watchlist'; // Default name for shares without a specified watchlist
-    let currentWatchlistName = DEFAULT_WATCHLIST_NAME; // The currently active watchlist (for saving)
+    const DEFAULT_WATCHLIST_NAME = 'My Watchlist';
+    const DEFAULT_WATCHLIST_ID_SUFFIX = 'default'; // A stable ID part for the default watchlist
+    let userWatchlists = []; // Array of { id: ..., name: ... }
+    let currentWatchlistId = null; // The ID of the currently active watchlist
+    let currentWatchlistName = DEFAULT_WATCHLIST_NAME; // Initialize with default name
 
 
     // --- Initial UI Setup ---
@@ -127,6 +137,12 @@ document.addEventListener('DOMContentLoaded', function() {
     calculatorModal.style.display = 'none'; // Ensure calculator modal is hidden
     updateMainButtonsState(false);
     if (loadingIndicator) loadingIndicator.style.display = 'block';
+
+    // Disable watchlist management elements initially
+    if (watchlistSelect) watchlistSelect.disabled = true;
+    if (addWatchlistBtn) addWatchlistBtn.disabled = true;
+    if (renameWatchlistBtn) renameWatchlistBtn.disabled = true;
+
 
     // --- PWA Service Worker Registration ---
     if ('serviceWorker' in navigator) {
@@ -221,13 +237,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Firebase Initialization and Authentication State Listener ---
     window.addEventListener('firebaseServicesReady', async () => {
+        // Assign global instances to local variables *first*
         db = window.firestoreDb;
         auth = window.firebaseAuth;
-        currentAppId = window.getFirebaseAppId();
+        currentAppId = window.getFirebaseAppId(); // Set appId here, will also be re-set in auth listener for robustness
+
+        // Debugging logs to confirm initial values
+        console.log("Firebase services ready. Initial values:");
+        console.log("db is defined:", !!db);
+        console.log("auth is defined:", !!auth);
+        console.log("currentAppId:", currentAppId);
 
         window.authFunctions.onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUserId = user.uid;
+                // Re-assign currentAppId here as a failsafe, although it should already be set from firebaseServicesReady
+                currentAppId = window.getFirebaseAppId();
+
+                // CRITICAL DEBUGGING: Explicit checks before any Firestore operations
+                console.log("User signed in. Checking critical variables before loading watchlists:");
+                console.log("db:", db);
+                console.log("currentUserId:", currentUserId);
+                console.log("currentAppId:", currentAppId);
+
+                if (!db || !currentUserId || !currentAppId) {
+                    console.error("CRITICAL ERROR: Essential Firebase variables are undefined/null AFTER sign-in. Cannot proceed with data loading.");
+                    showCustomAlert("App initialization error. Please refresh and ensure you are signed in.");
+                    clearShareList();
+                    clearWatchlistUI();
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    return; // Abort if critical dependencies are missing
+                }
+
                 updateAuthButtonText(true, user.email || user.displayName); // Pass user info to update button text
                 console.log("User signed in:", user.uid);
 
@@ -239,7 +280,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 updateMainButtonsState(true);
                 if (loadingIndicator) loadingIndicator.style.display = 'none';
-                await loadShares();
+                
+                // Pass db, currentAppId, currentUserId explicitly to loadUserWatchlists
+                await loadUserWatchlists(db, currentAppId, currentUserId);
             } else {
                 currentUserId = null;
                 updateAuthButtonText(false); // No user info needed for sign out state
@@ -247,6 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log("User signed out.");
                 updateMainButtonsState(false);
                 clearShareList();
+                clearWatchlistUI(); // Clear watchlist UI too
                 if (loadingIndicator) loadingIndicator.style.display = 'none';
             }
         });
@@ -297,6 +341,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // viewDetailsBtn disabled state is managed by selectShare function
         if (standardCalcBtn) standardCalcBtn.disabled = !enable;
         if (dividendCalcBtn) dividendCalcBtn.disabled = !enable;
+
+        // Enable watchlist management elements based on auth state
+        if (watchlistSelect) watchlistSelect.disabled = !enable;
+        if (addWatchlistBtn) addWatchlistBtn.disabled = !enable;
+        // Rename button only enabled if there are watchlists and one is selected
+        if (renameWatchlistBtn) renameWatchlistBtn.disabled = !(enable && userWatchlists.length > 0 && currentWatchlistId);
     }
 
     function showModal(modalElement) {
@@ -398,10 +448,235 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- Watchlist Management Functions ---
+
+    // Function to generate a consistent default watchlist ID
+    function getDefaultWatchlistId(userId) {
+        if (!userId) {
+            console.error("getDefaultWatchlistId: userId is undefined or null.");
+            return 'invalid_user_id_default'; // Fallback for debugging
+        }
+        return `${String(userId)}_${DEFAULT_WATCHLIST_ID_SUFFIX}`; // Ensure userId is string
+    }
+
+    // Load watchlists from Firestore and set the current one
+    async function loadUserWatchlists(_db, _appId, _userId) { // Accept parameters explicitly
+        console.log("Entering loadUserWatchlists. Debug values (passed as arguments):");
+        console.log("_db defined:", !!_db);
+        console.log("_userId:", _userId);
+        console.log("_appId:", _appId);
+
+        if (!_db || !_userId || !_appId) {
+            console.error("loadUserWatchlists: Essential Firebase variables are undefined/null. Aborting.");
+            showCustomAlert("Cannot load watchlists. Please ensure you are signed in and refresh the page.", 2000);
+            clearShareList();
+            clearWatchlistUI();
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            return;
+        }
+
+        userWatchlists = []; // Clear existing watchlists
+        // Correct path for watchlists: artifacts/{_appId}/users/{_userId}/watchlists
+        // Ensure string conversion for robustness, though template literals usually handle it.
+        const watchlistsColRef = window.firestore.collection(_db, `artifacts/${String(_appId)}/users/${String(_userId)}/watchlists`);
+
+        try {
+            const querySnapshot = await window.firestore.getDocs(watchlistsColRef);
+            querySnapshot.forEach(doc => {
+                userWatchlists.push({ id: doc.id, name: doc.data().name });
+            });
+
+            // If no watchlists exist, create a default one
+            if (userWatchlists.length === 0) {
+                const defaultWatchlistId = getDefaultWatchlistId(_userId);
+                console.log("Creating default watchlist with ID:", defaultWatchlistId); // Debugging
+                const defaultWatchlistRef = window.firestore.doc(_db, `artifacts/${String(_appId)}/users/${String(_userId)}/watchlists/${String(defaultWatchlistId)}`);
+                await window.firestore.setDoc(defaultWatchlistRef, { name: DEFAULT_WATCHLIST_NAME, createdAt: new Date().toISOString(), userId: _userId });
+                userWatchlists.push({ id: defaultWatchlistId, name: DEFAULT_WATCHLIST_NAME });
+                console.log("Created default watchlist successfully.");
+            }
+
+            // Sort watchlists alphabetically by name
+            userWatchlists.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Set current watchlist to the first one or default
+            currentWatchlistId = userWatchlists[0] ? userWatchlists[0].id : null;
+            if (currentWatchlistId) {
+                // Ensure currentWatchlistName is up-to-date with the actual name
+                const currentWatchlistObj = userWatchlists.find(w => w.id === currentWatchlistId);
+                if (currentWatchlistObj) {
+                    currentWatchlistName = currentWatchlistObj.name;
+                }
+            } else {
+                currentWatchlistName = 'No Watchlist Selected'; // Should not happen if default is created
+            }
+
+            renderWatchlistSelect(); // Populate the dropdown
+            updateMainButtonsState(true); // Re-enable buttons
+            // Call loadShares with the same explicitly passed variables for consistency
+            await loadShares(_db, _appId, _userId); 
+            await migrateOldSharesToWatchlist(_db, _appId, _userId); // Also pass for migration
+        } catch (error) {
+            console.error("Error loading user watchlists:", error);
+            showCustomAlert("Error loading watchlists. Please check your internet connection and Firebase Security Rules. Error: " + error.message);
+        } finally {
+            // Ensure loading indicator is hidden even on error
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+        }
+    }
+
+    // Function to render options in the watchlist dropdown
+    function renderWatchlistSelect() {
+        if (!watchlistSelect) return;
+        watchlistSelect.innerHTML = ''; // Clear existing options
+
+        if (userWatchlists.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No Watchlists Available';
+            watchlistSelect.appendChild(option);
+            watchlistSelect.disabled = true;
+            renameWatchlistBtn.disabled = true;
+            if (currentWatchlistTitle) currentWatchlistTitle.textContent = 'No Watchlist Selected';
+            return;
+        }
+
+        userWatchlists.forEach(watchlist => {
+            const option = document.createElement('option');
+            option.value = watchlist.id;
+            option.textContent = watchlist.name;
+            watchlistSelect.appendChild(option);
+        });
+
+        // Set the selected option based on currentWatchlistId
+        if (currentWatchlistId) {
+            watchlistSelect.value = currentWatchlistId;
+            const selectedWatchlistObj = userWatchlists.find(w => w.id === currentWatchlistId);
+            if (selectedWatchlistObj && currentWatchlistTitle) {
+                currentWatchlistTitle.textContent = selectedWatchlistObj.name;
+            }
+        } else if (userWatchlists.length > 0) {
+            // If currentWatchlistId is somehow null but watchlists exist, select the first one
+            watchlistSelect.value = userWatchlists[0].id;
+            currentWatchlistId = userWatchlists[0].id;
+            currentWatchlistName = userWatchlists[0].name;
+            if (currentWatchlistTitle) currentWatchlistTitle.textContent = userWatchlists[0].name;
+        } else {
+            if (currentWatchlistTitle) currentWatchlistTitle.textContent = 'No Watchlist Selected';
+        }
+
+        watchlistSelect.disabled = false;
+        renameWatchlistBtn.disabled = (userWatchlists.length === 0);
+    }
+
+    // Event listener for watchlist selection change
+    if (watchlistSelect) {
+        watchlistSelect.addEventListener('change', async () => {
+            currentWatchlistId = watchlistSelect.value;
+            const selectedWatchlistObj = userWatchlists.find(w => w.id === currentWatchlistId);
+            if (selectedWatchlistObj) {
+                currentWatchlistName = selectedWatchlistObj.name;
+                if (currentWatchlistTitle) currentWatchlistTitle.textContent = currentWatchlistName;
+                await loadShares(db, currentAppId, currentUserId); // Pass current global vars
+            }
+        });
+    }
+
+    // Add new watchlist handler
+    if (addWatchlistBtn) {
+        addWatchlistBtn.addEventListener('click', async () => {
+            if (!currentUserId || !db || !currentAppId) {
+                showCustomAlert("Please sign in and ensure app is fully loaded to add a watchlist.");
+                return;
+            }
+            const newWatchlistName = prompt("Enter the name for the new watchlist:");
+            if (newWatchlistName && newWatchlistName.trim() !== '') {
+                // Check if watchlist with this name already exists for the user
+                const exists = userWatchlists.some(wl => wl.name.toLowerCase() === newWatchlistName.trim().toLowerCase());
+                if (exists) {
+                    showCustomAlert("A watchlist with this name already exists. Please choose a different name.");
+                    return;
+                }
+
+                try {
+                    // Correct path for watchlists: artifacts/{appId}/users/{userId}/watchlists
+                    const watchlistsColRef = window.firestore.collection(db, `artifacts/${String(currentAppId)}/users/${String(currentUserId)}/watchlists`);
+                    const newWatchlistDocRef = await window.firestore.addDoc(watchlistsColRef, {
+                        name: newWatchlistName.trim(),
+                        createdAt: new Date().toISOString(),
+                        userId: currentUserId // Ensure userId is stored with watchlist
+                    });
+                    showCustomAlert(`Watchlist '${newWatchlistName}' added.`);
+                    await loadUserWatchlists(db, currentAppId, currentUserId); // Reload watchlists to update UI and select new one
+                    watchlistSelect.value = newWatchlistDocRef.id; // Select the newly created watchlist
+                    currentWatchlistId = newWatchlistDocRef.id;
+                    currentWatchlistName = newWatchlistName.trim();
+                    if (currentWatchlistTitle) currentWatchlistTitle.textContent = currentWatchlistName;
+                    await loadShares(db, currentAppId, currentUserId); // Load shares for the new watchlist (will be empty)
+                } catch (error) {
+                    console.error("Error adding watchlist:", error);
+                    showCustomAlert("Failed to add watchlist: " + error.message);
+                }
+            } else if (newWatchlistName !== null) { // If user clicked OK but entered empty string
+                showCustomAlert("Watchlist name cannot be empty.");
+            }
+        });
+    }
+
+    // Rename watchlist handler
+    if (renameWatchlistBtn) {
+        renameWatchlistBtn.addEventListener('click', async () => {
+            if (!currentWatchlistId || !currentUserId || !db || !currentAppId) {
+                showCustomAlert("Please select a watchlist to rename or sign in.");
+                return;
+            }
+            // Disallow renaming the default watchlist if its ID is the specific default ID
+            if (currentWatchlistId === getDefaultWatchlistId(currentUserId)) {
+                showCustomAlert("The default watchlist cannot be renamed.");
+                return;
+            }
+
+            const currentName = userWatchlists.find(wl => wl.id === currentWatchlistId)?.name || '';
+            const newWatchlistName = prompt(`Rename watchlist '${currentName}' to:`, currentName);
+
+            if (newWatchlistName && newWatchlistName.trim() !== '' && newWatchlistName.trim() !== currentName) {
+                // Check for duplicate name (excluding the current watchlist's own name)
+                const exists = userWatchlists.some(wl => wl.id !== currentWatchlistId && wl.name.toLowerCase() === newWatchlistName.trim().toLowerCase());
+                if (exists) {
+                    showCustomAlert("A watchlist with this name already exists. Please choose a different name.");
+                    return;
+                }
+
+                try {
+                    // Correct path for watchlists: artifacts/{appId}/users/{userId}/watchlists
+                    const watchlistDocRef = window.firestore.doc(db, `artifacts/${String(currentAppId)}/users/${String(currentUserId)}/watchlists/${String(currentWatchlistId)}`);
+                    await window.firestore.updateDoc(watchlistDocRef, { name: newWatchlistName.trim() });
+                    showCustomAlert(`Watchlist renamed to '${newWatchlistName}'.`);
+                    await loadUserWatchlists(db, currentAppId, currentUserId); // Reload watchlists to update dropdown
+                    // Ensure the dropdown still shows the renamed watchlist
+                    watchlistSelect.value = currentWatchlistId;
+                    currentWatchlistName = newWatchlistName.trim();
+                    if (currentWatchlistTitle) currentWatchlistTitle.textContent = currentWatchlistName;
+                } catch (error) {
+                    console.error("Error renaming watchlist:", error);
+                    showCustomAlert("Failed to rename watchlist: " + error.message);
+                }
+            } else if (newWatchlistName !== null && newWatchlistName.trim() === '') {
+                showCustomAlert("Watchlist name cannot be empty.");
+            }
+        });
+    }
+
     // --- Share Data Management Functions ---
-    async function loadShares() {
-        if (!db || !currentUserId) {
-            console.warn("Firestore DB or User ID not available for loading shares. Clearing list.");
+    async function loadShares(_db, _appId, _userId) { // Accept parameters explicitly
+        console.log("Entering loadShares. Debug values (passed as arguments):");
+        console.log("_db defined:", !!_db);
+        console.log("_userId:", _userId);
+        console.log("_appId:", _appId);
+        console.log("currentWatchlistId:", currentWatchlistId);
+
+        if (!_db || !_userId || !_appId || !currentWatchlistId) {
+            console.warn("Firestore DB, User ID, App ID, or Watchlist ID not available for loading shares. Clearing list.");
             clearShareList();
             return;
         }
@@ -410,37 +685,84 @@ document.addEventListener('DOMContentLoaded', function() {
         allSharesData = []; // Clear previous data from the array
 
         try {
-            const sharesCol = window.firestore.collection(db, 'shares');
-            const q = window.firestore.query(sharesCol, window.firestore.where("userId", "==", currentUserId));
+            const sharesCol = window.firestore.collection(_db, 'shares'); // Use passed _db
+            // Filter shares by userId AND currentWatchlistId
+            const q = window.firestore.query(
+                sharesCol,
+                window.firestore.where("userId", "==", _userId), // Use passed _userId
+                window.firestore.where("watchlistId", "==", currentWatchlistId) // Filter by active watchlist
+            );
             const querySnapshot = await window.firestore.getDocs(q);
 
             querySnapshot.forEach((doc) => {
                 const share = { id: doc.id, ...doc.data() };
-                // Ensure shares always have a watchlistName, especially for older data
-                if (!share.watchlistName) {
-                    share.watchlistName = DEFAULT_WATCHLIST_NAME;
-                }
                 allSharesData.push(share);
             });
-            console.log("Shares loaded successfully. Total shares:", allSharesData.length); // Debug
-            console.log("All shares data:", allSharesData); // Debug: Log entire data array
+            console.log("Shares loaded successfully for watchlist:", currentWatchlistName, ". Total shares:", allSharesData.length);
+            console.log("All shares data:", allSharesData);
 
 
             sortShares(); // This will also call renderWatchlist()
             renderAsxCodeButtons(); // Render ASX Code buttons
         } catch (error) {
             console.error("Error loading shares:", error);
-            console.error("If you see 'Missing or insufficient permissions' here, check your Firestore Security Rules and your data's 'userId' field for consistency.");
             showCustomAlert("Error loading shares. Please check your internet connection and sign-in status.");
         } finally {
             if (loadingIndicator) loadingIndicator.style.display = 'none';
         }
     }
 
+    // One-time migration function for old shares without a watchlistId
+    async function migrateOldSharesToWatchlist(_db, _appId, _userId) { // Accept parameters explicitly
+        if (!_db || !_userId || !_appId) { // Added appId check
+            console.warn("Migration skipped: DB, User ID, or App ID not available.");
+            return;
+        }
+
+        const sharesCol = window.firestore.collection(_db, 'shares'); // Use passed _db
+        // Query for shares belonging to the current user that DO NOT have a 'watchlistId' field
+        // To handle shares that existed before the `watchlistId` field was introduced.
+        // We cannot directly query for missing fields in Firestore.
+        // So, we'll fetch all shares for the user and filter client-side.
+        const q = window.firestore.query(
+            sharesCol,
+            window.firestore.where("userId", "==", _userId) // Use passed _userId
+        );
+
+        let sharesToMigrate = [];
+        try {
+            const querySnapshot = await window.firestore.getDocs(q);
+            querySnapshot.forEach(doc => {
+                const shareData = doc.data();
+                // Check if share belongs to current user AND does NOT have a watchlistId
+                if (shareData.userId === _userId && !shareData.hasOwnProperty('watchlistId')) { // Use passed _userId
+                    sharesToMigrate.push({ id: doc.id, ref: doc.ref });
+                }
+            });
+
+            if (sharesToMigrate.length > 0) {
+                console.log(`Migrating ${sharesToMigrate.length} old shares to '${DEFAULT_WATCHLIST_NAME}'.`);
+                const defaultWatchlistIdForMigration = getDefaultWatchlistId(_userId); // Use passed _userId
+                for (const share of sharesToMigrate) {
+                    await window.firestore.updateDoc(share.ref, { watchlistId: defaultWatchlistIdForMigration });
+                }
+                showCustomAlert(`Migrated ${sharesToMigrate.length} old shares to '${DEFAULT_WATCHLIST_NAME}'.`, 2000); // Slightly longer alert for migration
+                await loadShares(_db, _appId, _userId); // Reload all shares after migration with explicit params
+            }
+        } catch (error) {
+            console.error("Error migrating old shares:", error);
+            // Don't block app functionality for migration errors
+        }
+    }
+
+
     // Function to re-render the watchlist (table and cards) after sorting or other changes
     function renderWatchlist() {
         clearShareListUI();
-        allSharesData.forEach((share) => {
+        // Filter `allSharesData` based on `currentWatchlistId` before rendering
+        const sharesToRender = allSharesData.filter(share => share.watchlistId === currentWatchlistId);
+
+        sharesToRender.forEach((share) => {
             addShareToTable(share);
             // Only add to mobile cards if on a mobile viewport
             if (window.matchMedia("(max-width: 768px)").matches) {
@@ -451,11 +773,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // The deselectCurrentShare() function will handle clearing selection.
         if (selectedShareDocId) {
              // If a share was previously selected, try to re-select it if it still exists
-             const stillExists = allSharesData.some(share => share.id === selectedShareDocId);
+             const stillExists = sharesToRender.some(share => share.id === selectedShareDocId);
              if (stillExists) {
                 selectShare(selectedShareDocId);
              } else {
-                deselectCurrentShare(); // Deselect if the previously selected share was removed
+                deselectCurrentShare(); // Deselect if the previously selected share was removed or moved
              }
         } else {
             if (viewDetailsBtn) viewDetailsBtn.disabled = true;
@@ -472,6 +794,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (asxCodeButtonsContainer) asxCodeButtonsContainer.innerHTML = ''; // Clear ASX code buttons
         deselectCurrentShare(); // Ensure selection is cleared
     }
+
+    // New function to clear watchlist specific UI elements
+    function clearWatchlistUI() {
+        if (watchlistSelect) watchlistSelect.innerHTML = '';
+        userWatchlists = []; // Clear the internal array
+        if (currentWatchlistTitle) currentWatchlistTitle.textContent = 'No Watchlist Selected';
+        if (watchlistSelect) watchlistSelect.disabled = true;
+        if (renameWatchlistBtn) renameWatchlistBtn.disabled = true;
+    }
+
 
     // New function to deselect currently highlighted share
     function deselectCurrentShare() {
@@ -500,7 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (field === 'shareName') { // String comparison
                  valA = valA || ''; // Treat null/undefined as empty string
                  valB = valB || '';
-                 return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(a.shareName); // Corrected for string desc sort
+                 return order === 'asc' ? valA.localeCompare(b.shareName) : b.shareName.localeCompare(a.shareName); // Corrected for string desc sort
             }
 
             if (order === 'asc') {
@@ -559,17 +891,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         row.insertCell().textContent = share.targetPrice ? `$${share.targetPrice.toFixed(2)}` : '-'; // Use hyphen
 
+        // Dividend & Yields Cell (with updated label and alignment)
         const dividendCell = row.insertCell();
         const unfrankedYield = calculateUnfrankedYield(share.dividendAmount, share.lastFetchedPrice);
         const frankedYield = calculateFrankedYield(share.dividendAmount, share.lastFetchedPrice, share.frankingCredits);
         
-        // Corrected terminology and capitalization for in-cell display
         const divAmountDisplay = (share.dividendAmount !== null && !isNaN(share.dividendAmount)) ? `$${share.dividendAmount.toFixed(2)}` : '-';
 
-        // Updated label to "Dividend Yield"
-        dividendCell.innerHTML = `Dividend Yield: ${divAmountDisplay}<br>
-                                  Unfranked Yield: ${unfrankedYield !== null ? unfrankedYield.toFixed(2) + '%' : '-'}<br>
-                                  Franked Yield: ${frankedYield !== null ? frankedYield.toFixed(2) + '%' : '-'}`;
+        // Use a flex container for the content within the cell
+        dividendCell.innerHTML = `
+            <div class="dividend-yield-cell-content">
+                <span>Dividend Yield:</span> <span class="value">${divAmountDisplay}</span>
+            </div>
+            <div class="dividend-yield-cell-content">
+                <span>Unfranked Yield:</span> <span class="value">${unfrankedYield !== null ? unfrankedYield.toFixed(2) + '%' : '-'}</span>
+            </div>
+            <div class="dividend-yield-cell-content">
+                <span>Franked Yield:</span> <span class="value">${frankedYield !== null ? frankedYield.toFixed(2) + '%' : '-'}</span>
+            </div>
+        `;
 
         const commentsCell = row.insertCell();
         // Display only the first comment section's text, truncated for watchlist
@@ -832,8 +1172,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Data Operations (Add, Update, Delete) ---
     async function saveShare() {
-        if (!db || !currentUserId) {
-            showCustomAlert("You need to sign in to save shares. Please sign in with Google.");
+        if (!db || !currentUserId || !currentWatchlistId || !currentAppId) { // Added currentAppId check
+            showCustomAlert("You need to sign in and have an active watchlist to save shares. Please sign in with Google.");
             return;
         }
 
@@ -878,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', function() {
             lastFetchedPrice: isNaN(currentPrice) ? null : currentPrice, // Initially set to manual current price
             previousFetchedPrice: isNaN(currentPrice) ? null : currentPrice, // Initially same as lastFetchedPrice
             lastPriceUpdateTime: now, // Timestamp of this manual update
-            watchlistName: currentWatchlistName // Assign to the current default watchlist
+            watchlistId: currentWatchlistId // Assign to the currently active watchlist ID
         };
 
         try {
@@ -894,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showCustomAlert("Share added successfully!");
             }
             hideModal(shareFormSection);
-            await loadShares();
+            await loadShares(db, currentAppId, currentUserId); // Pass current global vars
             deselectCurrentShare(); // Deselect share after successful save/update
         } catch (error) {
             console.error("Error saving share:", error);
@@ -905,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function deleteShare() {
-        if (!selectedShareDocId || !db || !currentUserId) {
+        if (!selectedShareDocId || !db || !currentUserId || !currentAppId) { // Added currentAppId check
             showCustomAlert("No share selected for deletion or you are not signed in.");
             return;
         }
@@ -917,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("Share deleted:", selectedShareDocId);
             showCustomAlert("Share deleted successfully!");
             hideModal(shareFormSection); // Hide the form after successful deletion
-            await loadShares(); // Reload the shares to update the UI
+            await loadShares(db, currentAppId, currentUserId); // Reload the shares to update the UI
             deselectCurrentShare(); // Deselect share after successful deletion
         } catch (error) {
             console.error("Error deleting share:", error);
@@ -1261,9 +1601,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!asxCodeButtonsContainer) return;
         asxCodeButtonsContainer.innerHTML = ''; // Clear any existing buttons
 
-        if (allSharesData.length === 0) {
+        // Only display ASX code buttons for the currently selected watchlist's shares
+        const sharesInCurrentWatchlist = allSharesData.filter(share => share.watchlistId === currentWatchlistId);
+
+        if (sharesInCurrentWatchlist.length === 0) {
             const noSharesMsg = document.createElement('div');
-            noSharesMsg.textContent = 'Add your first share to the watchlist!';
+            noSharesMsg.textContent = 'Add your first share to this watchlist!';
             noSharesMsg.style.padding = '5px 15px';
             noSharesMsg.style.textAlign = 'center';
             noSharesMsg.style.color = '#555';
@@ -1273,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Sort shares by ASX code for the buttons
-        const sortedShares = [...allSharesData].sort((a, b) => {
+        const sortedShares = [...sharesInCurrentWatchlist].sort((a, b) => {
             if (a.shareName && b.shareName) {
                 return a.shareName.localeCompare(b.shareName);
             }
