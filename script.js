@@ -1,4 +1,4 @@
-// File Version: v36
+// File Version: v37
 // Last Updated: 2025-06-25
 
 // This script interacts with Firebase Firestore for data storage.
@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Custom Dialog (Alert/Confirm) Functions ---
     // Updated to auto-dismiss
-    function showCustomAlert(message, duration = 2500) { // Default duration 2.5 seconds
+    function showCustomAlert(message, duration = 1000) { // Default duration 1 second (1000ms)
         customDialogMessage.textContent = message;
         // Hide buttons for auto-dismissing alerts
         customDialogConfirmBtn.style.display = 'none'; 
@@ -546,10 +546,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const unfrankedYield = calculateUnfrankedYield(share.dividendAmount, share.lastFetchedPrice);
         const frankedYield = calculateFrankedYield(share.dividendAmount, share.lastFetchedPrice, share.frankingCredits);
         
-        // Corrected terminology and capitalization for in-cell display, conditional dollar sign
+        // Corrected terminology and capitalization
         const divAmountDisplay = (share.dividendAmount !== null && !isNaN(share.dividendAmount)) ? `$${share.dividendAmount.toFixed(2)}` : '-';
 
-        dividendCell.innerHTML = `DIV Yield: ${divAmountDisplay}<br>
+        dividendCell.innerHTML = `Div. Yield: ${divAmountDisplay}<br>
                                   Unfranked Yield: ${unfrankedYield !== null ? unfrankedYield.toFixed(2) + '%' : '-'}<br>
                                   Franked Yield: ${frankedYield !== null ? frankedYield.toFixed(2) + '%' : '-'}`;
 
@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Entered:</strong> ${formatDate(share.entryDate) || '-'}</p>
             <p><strong>Current:</strong> <span class="${priceClass}">$${share.lastFetchedPrice ? share.lastFetchedPrice.toFixed(2) : '-'}</span> ${formatDate(share.lastPriceUpdateTime) ? `(${formatDate(share.lastPriceUpdateTime)})` : ''}</p>
             <p><strong>Target:</strong> ${share.targetPrice ? `$${share.targetPrice.toFixed(2)}` : '-'}</p>
-            <p><strong>DIV Yield:</strong> ${divAmountDisplay}</p>
+            <p><strong>Div. Yield:</strong> ${divAmountDisplay}</p>
             <p><strong>Franking:</strong> ${share.frankingCredits ? share.frankingCredits + '%' : '-'}</p>
             <p><strong>Unfranked Yield:</strong> ${unfrankedYield !== null ? unfrankedYield.toFixed(2) + '%' : '-'}</p>
             <p><strong>Franked Yield:</strong> ${frankedYield !== null ? frankedYield.toFixed(2) + '%' : '-'}</p>
